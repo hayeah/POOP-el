@@ -292,3 +292,135 @@
           (loop for e in el
              do (catch 'next (funcall fn e))))
         self))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Edit Types
+
+;;(Buffer :temp)
+;;(Buffer "name")
+;;(Buffer) == (Buffer :current)
+(defobj Buffer (&optional buf-or-name)
+  (self :set 'el (if buf-or-name (get-buffer buf-or-name)
+                     (current-buffer))))
+
+(macrolet ((wcb (&rest body)
+             `(with-current-buffer (self :el)
+                ,@body)))
+  (obj (b Buffer)
+    (b :set 'to_s
+       (lambda (&optional from to no-properties)
+         (String (self :substr from to no-properties))))
+    (b :set 'substr
+       (lambda (&optional from to no-properties)
+         (wcb (let ((from (or from (point-min)))
+                    (to (or to (point-max))))
+                (if no-properties
+                    (buffer-substring-no-properties from to)
+                    (buffer-substring from to))))))
+    (b :set 'size
+       (lambda ()
+         (buffer-size (self :el))))
+    (b :set 'length
+       (lambda () (self :size)))
+    (b :set 'n
+       (lambda () (wcb (point))))
+    (b :set 'eob?
+       (lambda () (wcb (eobp))))
+    (b :set 'each
+       (lambda (fn &optional no-props)
+         (lexical-let ((fn fn)
+                       (done nil))
+           (wcb (self :gg)
+                (while (not done)
+                  (let ((a (self :^ :n))
+                        (b (self :$ :n)))
+                    (if (eobp) (setq done t)
+                        (self :> 1 :line)
+                        (funcall fn (self :to_s a b no-props)))))))))
+    ;; insertion
+    (b :set 'insert
+       (lambda (str) (with-current-buffer (self :el)
+                       (insert str))))
+    ;;insert-before-markers
+    ;;insert-buffer-substring
+    ;;insert-buffer-substring-no-properties
+    ;;
+    ;; motion methods
+    (b :set 'go
+       (lambda (pos)
+         (wcb (elp-buffer-goto pos))
+         self))
+    (b :set 'gg
+       (lambda ()
+         (wcb (beginning-of-buffer))
+         self))
+    (b :set 'GG
+       (lambda ()
+         (wcb (end-of-buffer))
+         self))
+    (b :set '^
+       (lambda ()
+         (wcb (beginning-of-line))
+         self))
+    (b :set '$
+       (lambda ()
+         (wcb (end-of-line))
+         self))
+    (b :set '>
+       (lambda (&optional n kind)
+         (wcb (elp-buffer-move 1 n kind))
+         self))
+    (b :set '<
+       (lambda (&optional n kind)
+         (wcb (elp-buffer-move -1 n kind))
+         self))
+    ;; context setting methods
+    (b :set 'narrow
+       (lambda (&optional from to)
+         (wcb (let ((from (or from (point-min)))
+                    (to (or to (point-max))))
+                (narrow-to-region from to)))))
+    (b :set 'widen
+       (lambda ()
+         (wcb (let ((from (or from (point-min)))
+                    (to (or to (point-max))))
+                (widen)))))
+    (b :set 'restrict
+       (lambda (from to fn)
+         (lexical-let ((fn fn))
+           (save-restriction
+             (self :narrow from to)
+             (wcb (funcall fn)))
+           )))
+    (b :set 'keep
+       (lambda (fn)
+         (lexical-let ((fn fn))
+           (save-excursion
+             (wcb (funcall fn))))))
+    (b :set 'do
+       (lambda (fn)
+         (lexical-let ((fn fn))
+           (wcb (funcall fn)))))))
+
+
+(defun elp-buffer-goto (n &optional kind)
+  (let ((kind (or kind 'char)))
+    (cond ((eql kind 'char)
+           (goto-char n))
+          ((eql kind 'line)
+           (goto-line n))
+          )))
+
+(defun elp-buffer-move (dir &optional n kind)
+  (let ((n (* (or n 1) dir))
+        (kind (or kind 'char)))
+    (cond ((eql kind 'char)
+           (forward-char n))
+          ((eql kind 'word)
+           (forward-word n))
+          ((eql kind 'line)
+           (forward-line n))
+          ;; TODO regexp
+          )))
+
+;current-word

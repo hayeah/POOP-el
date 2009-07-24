@@ -78,5 +78,3 @@
        'abc
        (obj (v (List "abc"))
          (v :to_sym)))))
-
-
