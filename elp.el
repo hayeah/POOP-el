@@ -140,40 +140,61 @@
             ,@body
             self))))
 
-;; bootstrap completed
-
 (defun elp-extend (o)
   (obj o
     (maphash (lambda (k v) (self :set k v))
              (o :get 'properties))
-       self))
+    self))
+
+;; bootstrap completed
 
 (obj Object
   (Object :set 'extend 'elp-extend))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Enum
 
 (defobj Enum ())
 
 (obj Enum
      (Enum :set 'map 'elp-enum-map)
-     (Enum :set 'select 'elp-enum-select))
+     (Enum :set 'select 'elp-enum-select)
+     (Enum :set 'all? 'elp-enum-all)
+     (Enum :set 'any? 'elp-enum-any))
 
 (defun elp-enum-map (fn)
   (lexical-let ((fn fn)
                 (acc nil))
     (self :each
           (lambda (e)
-            (setq acc (cons (funcall fn e) acc))))
-    (reverse acc)))
+            (push (funcall fn e) acc)))
+    (self :constructor (nreverse acc))))
 
-(defun elp-enum-select (fn)
+(defun elp-enum-all (fn)
   (lexical-let ((fn fn)
-                (acc nil))
+                (r t))
     (self :each
           (lambda (e)
+            (unless (funcall fn e) (setq r nil)
+                    (break))))
+    r))
+
+(defun elp-enum-any (fn)
+  (lexical-let ((fn fn)
+                (r nil))
+    (self :each
+          (lambda (e)
+            (if (funcall fn e) (setq r t)
+                (break))))
+    r))
+
+(defun elp-enum-select (fn)
+  (lexical-let ((fn fn))
+    (self :map
+          (lambda (e) 
             (if (funcall fn e)
-                (setq acc (cons e acc))
-                (next))))
-    (reverse acc)))
+                e
+                (next))))))
 
 (defun elp-enum-map (fn)
   ;; lame. gotta use lexical binding, else nested
@@ -186,30 +207,88 @@
             (setq acc (cons (funcall fn e) acc))))
     (reverse acc)))
 
-(defobj Array (o)
-  (self :set 'content
-        (cond ((arrayp o) o)
-              ((listp o) (vconcat o)))))
 
-(obj Array
-  (Array :set 'size
-         (lambda () (length (self :content))))
-  (Array :set 'length
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Seq Types
+;;
+;; Rather than going along with emacs, I chose to
+;; call Vector "Array", and Array "Vector".
+(defobj Seq ())
+;; Array, String, List
+(obj Seq
+  (Seq :extend Enum)
+  (Seq :set 'size
+         (lambda () (length (self :el))))
+  (Seq :set 'length
          (lambda () (self :size)))
-  (Array :set 'at
-         (lambda (i) (aref (self :content) i)))
-  (Array :set 'each 'elp-array-each)
-  (Array :extend Enum))
+  (Seq :set 'at
+         (lambda (i) (elt (self :el) i)))
+  (Seq :set 'at!
+       (lambda (i v)
+         (setf (elt (self :el) i) v)
+         self))
+  (Seq :set 'copy
+         (lambda () (self :constructor (copy-sequence (self :el)))))
+  (Seq :set 'to_a
+       (lambda () (Array (self :el))))
+  (Seq :set 'to_s
+       (lambda () (String (self :el))))
+  (Seq :set 'to_l
+       (lambda () (List (self :el))))
+  (Seq :set 'to_sym
+       (lambda () (intern (self :to_s :el)))))
 
-(defun elp-array-each (fn)
+;;
+
+;; Array, String, char-table, bool-vector
+(defobj Vector ())
+(obj Vector
+  (Vector :extend Seq)
+  (Vector :set 'each 'elp-vector-each)
+  )
+
+(defun elp-vector-each (fn)
   (lexical-let ((fn fn))
     (flet ((next () (throw 'next nil))
            (break () (throw 'break nil)))
       (catch 'break
         ;; (loop for i from 0 to (1- (self :length))
 ;;            do (catch 'next (funcall fn (self :at i))))
-        (let ((content (self :content)))
-          (loop for i from 0 to (1- (length content))
-             do (catch 'next (funcall fn (aref content i)))))
+        (let ((el (self :el)))
+          (loop for i from 0 to (1- (length el))
+             do (catch 'next (funcall fn (aref el i)))))
         self))))
 
+(defobj Array (o)
+  (self :set 'el
+        (cond ((vectorp o) o)
+              ((sequencep o) (vconcat o))
+              (t (error "expects a sequence")))))
+(obj Array
+  (Array :extend Vector))
+
+(defobj String (o)
+  (self :set 'el
+        (cond ((stringp o) o)
+              ((sequencep o) (concat o)))))
+(obj String
+  (String :extend Vector))
+
+(defobj List (o)
+  (self :set 'el
+        (cond ((listp o) o)
+              ((sequencep o) (append o nil)))))
+
+(obj List
+  (List :extend Seq)
+  (List :set 'each 'elp-list-each))
+
+(defun elp-list-each (fn)
+  (lexical-let ((fn fn))
+    (flet ((next () (throw 'next nil))
+           (break () (throw 'break nil)))
+      (catch 'break
+        (let ((el (self :el)))
+          (loop for e in el
+             do (catch 'next (funcall fn e))))
+        self))))
