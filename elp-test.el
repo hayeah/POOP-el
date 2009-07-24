@@ -31,7 +31,7 @@
       (assert-eql 3 (a :size))
       (assert-eql (a :size) (a :length))
       (assert-eql 2 (a :at 1))
-      (assert-equal [2 3 4] (a :map (lambda (e) (1+ e))
+      (assert-equal '(2 3 4) (a :map (lambda (e) (1+ e))
                                :el))
       (assert-eql 0 (progn (a :at! 1 0)
                            (a :at 1)))
@@ -42,6 +42,7 @@
          (a :at! 1 50
             :map (fn (e) (+ 100 e))
             :select (fn (e) (= (mod e 2) 0))
+            :to_a
             :el)))
 
       (assert-equal

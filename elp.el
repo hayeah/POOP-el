@@ -203,9 +203,10 @@
   (lexical-let ((fn fn)
                 (acc nil))
     (self :each
-          (lambda (e)
-            (setq acc (cons (funcall fn e) acc))))
-    (reverse acc)))
+          (lambda (e) (push (funcall fn e) acc)))
+    (List (nreverse acc))))
+
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
