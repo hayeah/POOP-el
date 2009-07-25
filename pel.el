@@ -1,14 +1,14 @@
 ;; to test with eql
-(defvar *elp-secret-value* nil)
-(setq *elp-secret-value* "secret")
-(defvar *elp-undefined* nil)
-(setq *elp-undefined* "undefined")
+(defvar *pel-secret-value* nil)
+(setq *pel-secret-value* "secret")
+(defvar *pel-undefined* nil)
+(setq *pel-undefined* "undefined")
 
 
-(defvar *elp-object-prototype*
+(defvar *pel-object-prototype*
   (make-hash-table))
 
-(defun elp-call (__object __prop &rest __args)
+(defun pel-call (__object __prop &rest __args)
   ;; uhh.. i dunno how to cache lookup.
   ;; if property value is a function, we apply it.
   ;; if property value is any other value type, return it
@@ -16,15 +16,15 @@
     ;; we use flet and let to set the dynamic
     ;; bindings for self for both variable and
     ;; function.
-    (lexical-let ((val (elp-prop __object __prop)))
+    (lexical-let ((val (pel-prop __object __prop)))
       (if (functionp val)
           (apply val __args)
           val))))
 
 (defmacro self (&rest args)
-  `(elp-call-form (self ,@args)))
+  `(pel-call-form (self ,@args)))
 
-(defmacro elp-call-form (form)
+(defmacro pel-call-form (form)
   (let* ((object (car form))
          (es (reverse (cdr form)))
          args
@@ -48,7 +48,7 @@
                           (method (intern (substring (symbol-name (car call)) 1)))
                           (args (cdr call)))
                      (recur (cdr calls)
-                            `(elp-call ,object ',method
+                            `(pel-call ,object ',method
                                        ,@args)))
                    )))
       (recur chain object)
@@ -57,16 +57,16 @@
 
 
 (defvar Object nil)
-(setq Object (vector 'Object *elp-object-prototype* (make-hash-table)))
+(setq Object (vector 'Object *pel-object-prototype* (make-hash-table)))
 
-(puthash 'constructor 'Object *elp-object-prototype*)
-(puthash 'get 'elp-get *elp-object-prototype*)
-(puthash 'set 'elp-set *elp-object-prototype*)
+(puthash 'constructor 'Object *pel-object-prototype*)
+(puthash 'get 'pel-get *pel-object-prototype*)
+(puthash 'set 'pel-set *pel-object-prototype*)
 
 (defun Object ()
   (vector 'Object Object (make-hash-table)))
 
-(defun elp-set (prop val)
+(defun pel-set (prop val)
   (case prop
     ;; quick access for builtin properties
     (get (error "get is constant"))
@@ -82,25 +82,25 @@
          (error "must set property to a hashtable")))
     (t (puthash prop val (aref self 2)))))
 
-(defun elp-get (prop)
-  (elp-prop self prop))
+(defun pel-get (prop)
+  (pel-prop self prop))
 
-(defun elp-prop (__object __prop)
+(defun pel-prop (__object __prop)
   ;; first lookup in object properties
   (case __prop
     ;; quick access for builtin properties
-    (get 'elp-get)
-    (set 'elp-set)
+    (get 'pel-get)
+    (set 'pel-set)
     (constructor (aref __object 0))
     (prototype (aref __object 1))
     (properties (aref __object 2))
-    (t (lexical-let ((val (gethash __prop (aref __object 2) *elp-undefined*)))
-         (if (eql *elp-undefined* val)
+    (t (lexical-let ((val (gethash __prop (aref __object 2) *pel-undefined*)))
+         (if (eql *pel-undefined* val)
              (if (eql __object Object)
                  ;; lookup the prototype of root object. If not found, return undefined
-                 (gethash __prop (aref __object 1) *elp-undefined*)
+                 (gethash __prop (aref __object 1) *pel-undefined*)
                  ;; recurse into prototype
-                 (elp-prop (aref __object 1) __prop))
+                 (pel-prop (aref __object 1) __prop))
              val)))))
 
 (defmacro obj (bindings-or-var &rest body)
@@ -116,7 +116,7 @@
                                        (args (gensym)))
                                    `(let ((,name ,val))
                                       (macrolet ((,name (&rest ,args)
-                                                   `(elp-call-form (,',name ,@,args))))
+                                                   `(pel-call-form (,',name ,@,args))))
                                         ,body))
                                    )
                                  ))))
@@ -127,7 +127,7 @@
            (pr 'obj name)
            `(macrolet ((,name (&rest ,args)
                            (pr ,args)
-                           `(elp-call-form (,',name ,@,args))))
+                           `(pel-call-form (,',name ,@,args))))
                 ,@body)
            ))))
 
@@ -140,7 +140,7 @@
             ,@body
             self))))
 
-(defun elp-extend (o)
+(defun pel-extend (o)
   (obj o
     (maphash (lambda (k v) (self :set k v))
              (o :get 'properties))
@@ -149,7 +149,7 @@
 ;; bootstrap completed
 
 (obj Object
-  (Object :set 'extend 'elp-extend))
+  (Object :set 'extend 'pel-extend))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Enum
@@ -157,12 +157,12 @@
 (defobj Enum ())
 
 (obj Enum
-     (Enum :set 'map 'elp-enum-map)
-     (Enum :set 'select 'elp-enum-select)
-     (Enum :set 'all? 'elp-enum-all)
-     (Enum :set 'any? 'elp-enum-any))
+     (Enum :set 'map 'pel-enum-map)
+     (Enum :set 'select 'pel-enum-select)
+     (Enum :set 'all? 'pel-enum-all)
+     (Enum :set 'any? 'pel-enum-any))
 
-(defun elp-enum-map (fn)
+(defun pel-enum-map (fn)
   (lexical-let ((fn fn)
                 (acc nil))
     (self :each
@@ -170,7 +170,7 @@
             (push (funcall fn e) acc)))
     (self :constructor (nreverse acc))))
 
-(defun elp-enum-all (fn)
+(defun pel-enum-all (fn)
   (lexical-let ((fn fn)
                 (r t))
     (self :each
@@ -179,7 +179,7 @@
                     (break))))
     r))
 
-(defun elp-enum-any (fn)
+(defun pel-enum-any (fn)
   (lexical-let ((fn fn)
                 (r nil))
     (self :each
@@ -188,7 +188,7 @@
                 (break))))
     r))
 
-(defun elp-enum-select (fn)
+(defun pel-enum-select (fn)
   (lexical-let ((fn fn))
     (self :map
           (lambda (e) 
@@ -196,7 +196,7 @@
                 e
                 (next))))))
 
-(defun elp-enum-map (fn)
+(defun pel-enum-map (fn)
   ;; lame. gotta use lexical binding, else nested
   ;; lambdas bounded to the same symbol would
   ;; flatten to self recursion.
@@ -245,10 +245,10 @@
 (defobj Vector ())
 (obj Vector
   (Vector :extend Seq)
-  (Vector :set 'each 'elp-vector-each)
+  (Vector :set 'each 'pel-vector-each)
   )
 
-(defun elp-vector-each (fn)
+(defun pel-vector-each (fn)
   (lexical-let ((fn fn))
     (flet ((next () (throw 'next nil))
            (break () (throw 'break nil)))
@@ -282,9 +282,9 @@
 
 (obj List
   (List :extend Seq)
-  (List :set 'each 'elp-list-each))
+  (List :set 'each 'pel-list-each))
 
-(defun elp-list-each (fn)
+(defun pel-list-each (fn)
   (lexical-let ((fn fn))
     (flet ((next () (throw 'next nil))
            (break () (throw 'break nil)))
@@ -336,7 +336,7 @@
                   (let ((a (self :^ :n))
                         (b (self :$ :n)))
                     (if (eobp) (setq done t)
-                        (self :> 1 :line)
+                        (self :> 1 'line)
                         (funcall fn (self :to_s a b no-props)))))))))
     ;; insertion
     (b :set 'insert
@@ -349,7 +349,7 @@
     ;; motion methods
     (b :set 'go
        (lambda (pos)
-         (wcb (elp-buffer-goto pos))
+         (wcb (pel-buffer-goto pos))
          self))
     (b :set 'gg
        (lambda ()
@@ -369,11 +369,11 @@
          self))
     (b :set '>
        (lambda (&optional n kind)
-         (wcb (elp-buffer-move 1 n kind))
+         (wcb (pel-buffer-move 1 n kind))
          self))
     (b :set '<
        (lambda (&optional n kind)
-         (wcb (elp-buffer-move -1 n kind))
+         (wcb (pel-buffer-move -1 n kind))
          self))
     ;; context setting methods
     (b :set 'narrow
@@ -404,7 +404,7 @@
            (wcb (funcall fn)))))))
 
 
-(defun elp-buffer-goto (n &optional kind)
+(defun pel-buffer-goto (n &optional kind)
   (let ((kind (or kind 'char)))
     (cond ((eql kind 'char)
            (goto-char n))
@@ -412,7 +412,7 @@
            (goto-line n))
           )))
 
-(defun elp-buffer-move (dir &optional n kind)
+(defun pel-buffer-move (dir &optional n kind)
   (let ((n (* (or n 1) dir))
         (kind (or kind 'char)))
     (cond ((eql kind 'char)

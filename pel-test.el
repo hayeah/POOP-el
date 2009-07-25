@@ -8,15 +8,15 @@
       (o2 :extend o1)
       (o1 :set 'v2 1)
       (assert-eql 1 (o2 :v1))
-      (assert-eql *elp-undefined* (o2 :v2))
+      (assert-eql *pel-undefined* (o2 :v2))
       ))
 
 (deftest "prototype"
     (obj (f (Object)
           b (Object))
       (b :set 'prototype f)
-      (assert-eql *elp-undefined* (f :get 'foo))
-      (assert-eql *elp-undefined* (b :get 'foo))
+      (assert-eql *pel-undefined* (f :get 'foo))
+      (assert-eql *pel-undefined* (b :get 'foo))
       (f :set 'foo 10)
       (assert-eql 10 (f :get 'foo))
       ;; b should get the value of the prototype
