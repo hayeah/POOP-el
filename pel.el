@@ -400,6 +400,15 @@
        (lambda (&optional n kind)
          (wcb (pel-buffer-move -1 n kind))
          self))
+
+    (b :set 're>
+       ;; don't want to return self, because we want to know the search result.
+       (lambda (re &optional fn)
+         (pel-buffer-re> re fn)))
+    (b :set 're<
+       (lambda (re &optional n fn)
+         (pel-buffer-re< re fn)))
+    
     ;; context setting methods
     (b :set 'narrow
        (lambda (&optional from to)
@@ -440,13 +449,33 @@
 (defun pel-buffer-move (dir &optional n kind)
   (let ((n (* (or n 1) dir))
         (kind (or kind 'char)))
-    (cond ((eql kind 'char)
-           (forward-char n))
-          ((eql kind 'word)
-           (forward-word n))
-          ((eql kind 'line)
-           (forward-line n))
-          ;; TODO regexp
-          )))
+    (case kind
+      (char (forward-char n))
+      (word (forward-word n))
+      (line (forward-line n)))))
+
+(defun pel-buffer-re> (re &optional fn)
+  (pel-buffer-re-move 're-search-forward re fn))
+
+(defun pel-buffer-re< (re &optional fn)
+  (pel-buffer-re-move 're-search-backward re fn))
+
+(defun pel-buffer-re-move (re-search re &optional fn)
+  (lexical-let ((fn fn)
+                (r (funcall re-search re nil t)))
+    (when r
+      (flet (($ (n) (match-string n))
+             (sub (replacement &optional subexp fixedcase literal)
+               (replace-match replacement
+                              fixedcase literal nil subexp)
+               ;; apparently replace-match doesn't
+               ;; return anything when acting on
+               ;; buffer. More useful to return non-nil value.
+               t))
+        (if fn (funcall fn)
+            r)))))
+
+
+
 
 ;current-word
