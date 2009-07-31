@@ -79,3 +79,26 @@
        'abc
        (obj (v (List "abc"))
          (v :to_sym)))))
+
+(deftest "String"
+    (assert-equal
+     "aabb3x3x3x3x"
+     (obj (s (String "aabbcc"))
+      (s :gsub "c" "3131"
+         :gsub "1" "x"
+         :el)
+      ))
+  (assert-equal
+   "Aa Bb Cc"
+   (obj (s (String "aa bb cc"))
+     (s :capitalize :el)))
+  (assert-equal
+   '("00aaaebbb11" "aaa" "bbb" nil)
+   (obj (s (String "00aaaebbb11"))
+     (s :match "\\(a*\\)e\\(b*\\)"
+        (fn ()
+            (list
+             (concat $b $m $a)
+             ($ 1) ($ 2) ($ 3)))))))
+
+

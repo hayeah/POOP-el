@@ -272,8 +272,33 @@
   (self :set 'el
         (cond ((stringp o) o)
               ((sequencep o) (concat o)))))
-(obj String
-  (String :extend Vector))
+
+(obj (o String)
+  (o :extend Vector)
+  (o :set 'gsub
+     (lambda (regexp rep)
+       (String (replace-regexp-in-string regexp rep (self :el))))
+     )
+  (o :set 'match
+     (lambda (regexp fn)
+       (lexical-let* ((str (self :el))
+                      (fn fn))
+         (when (string-match regexp str)
+           (let (;; before match
+                 ($b (substring str 0 (match-beginning 0)))
+                 ;; match itself
+                 ($m (match-string 0 str))
+                 ;; after match
+                 ($a (substring str (match-end 0) (length str))))
+             (flet (($ (n) (match-string n str))
+                    ;; for consistency
+                    ($b () $b)
+                    ($m () $m)
+                    ($a () $a)
+                    )
+               (funcall fn)))))))
+  (o :set 'capitalize
+     (lambda () (String (capitalize (self :el))))))
 
 (defobj List (o)
   (self :set 'el
